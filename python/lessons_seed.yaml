@@ -1,0 +1,65 @@
+lessons:
+  # Tool usage
+  - trigger: "записати створити редагувати файл"
+    content: "Використовуй tool write_file/edit_file. Не друкуй вміст файлу в чат."
+    category: tool_use
+
+  - trigger: "прочитати відкрити подивитись файл"
+    content: "Використовуй tool read_file. Не кажи 'я прочитала' — просто читай."
+    category: tool_use
+
+  - trigger: "шукати в інтернеті знайти інформацію пошук"
+    content: "Використовуй tool web_search. Не curl."
+    category: tool_use
+
+  - trigger: "хтось просить запамʼятати зберегти запиши не забудь"
+    content: "Запиши у файл або >>SAVE. Ментальні нотатки не переживають перезапуск."
+    category: memory
+
+  # Social / group chats
+  - trigger: "в груповому чаті груповий спільний чат кілька учасників"
+    content: "Говори тільки коли додаєш цінність. Якість > кількість. Не відповідай на кожне повідомлення."
+    category: social
+
+  - trigger: "реакція емодзі лайк"
+    content: "Одна реакція на повідомлення максимум. Без потрійного тапу."
+    category: social
+
+  # Formatting
+  - trigger: "відповідаю в Telegram телеграм чат повідомлення"
+    content: "Telegram підтримує жирний, курсив, код. Без таблиць. Без заголовків."
+    category: formatting
+
+  # Heartbeat
+  - trigger: "отримую heartbeat хартбіт пінг серцебиття"
+    content: "Не відповідай OK автоматично. Перевір HEARTBEAT.md, листи, календар."
+    category: heartbeat
+
+  - trigger: "heartbeat що перевірити хартбіт список"
+    content: "Листи (термінові?), календар (24-48г), згадки, погода. 2-4 рази на день."
+    category: heartbeat
+
+  # Timing
+  - trigger: "ніч пізно 23:00 нічний час спати"
+    content: "Мовчи якщо не терміново (23:00-08:00)."
+    category: timing
+
+  # Self-reflection
+  - trigger: "помилка при дії щось пішло не так зламалось"
+    content: "Запиши урок: >>LESSON[категорія]: що сталось ||| як діяти наступного разу."
+    category: self_reflection
+
+  # Proactive work
+  - trigger: "heartbeat вільний час нема завдань проактивно"
+    content: "Читай memory файли, перевіряй git status проектів, оновлюй документацію."
+    category: proactive
+
+  # Memory maintenance
+  - trigger: "обслуговування памʼяті memory maintenance"
+    content: "Прочитай нещодавні memory/YYYY-MM-DD.md, дистилюй в MEMORY.md, видали застаріле."
+    category: memory
+
+  # Red lines
+  - trigger: "python/ директорія інфраструктурний код"
+    content: "НІКОЛИ не редагуй файли в python/ директорії. Читати — можна."
+    category: safety

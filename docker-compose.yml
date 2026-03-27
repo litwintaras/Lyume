@@ -1,0 +1,42 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lyume}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_memory}
+    volumes:
+      - lyume_pgdata:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  proxy:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+        LYUME_LLM_URL: http://host.docker.internal:1234
+        LYUME_EMBED_URL: http://host.docker.internal:1234
+        LYUME_EMBED_MODEL: nomic-embed-text
+        LYUME_EMBED_PROVIDER: http
+        LYUME_DB_HOST: db
+        LYUME_DB_PORT: "5432"
+        LYUME_DB_USER: ${POSTGRES_USER:-postgres}
+        LYUME_DB_PASSWORD: ${POSTGRES_PASSWORD:-lyume}
+        LYUME_DB_NAME: ${POSTGRES_DB:-ai_memory}
+    ports:
+      - "${PROXY_PORT:-1235}:1235"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    working_dir: /app/python
+
+volumes:
+  lyume_pgdata:
