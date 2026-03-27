@@ -1,0 +1,70 @@
+# Lyume Configuration
+# Copy this file to config.yaml and adjust values
+# Or run the wizard: python -m wizard
+
+first_run: false
+
+server:
+  host: "127.0.0.1"
+  port: 1235
+  log_level: info
+
+llm:
+  url: "http://127.0.0.1:11434/v1"
+  api_key: ""
+  model: "your-model-name"
+  request_timeout: 300
+  reflection_timeout: 120
+  reflection_max_messages: 30
+
+database:
+  provider: docker
+  host: "127.0.0.1"
+  port: 5432
+  user: postgres
+  password: "change-me"
+  name: ai_memory_lyume
+  pool_min: 1
+  pool_max: 5
+
+embedding:
+  provider: http
+  url: "http://127.0.0.1:11434/v1"
+  model: "nomic-embed-text"
+  dimensions: 768
+
+memory:
+  search_limit: 3
+  similarity_threshold: 0.3
+  dedup_similarity: 0.9
+  save_max_chars: 300
+  dedup_ttl: 5
+  hybrid_search: true
+  hybrid_rrf_k: 60
+  hybrid_bm25_limit: 10
+  proactive_high_similarity: 0.85
+  proactive_dormant_days: 30
+
+lessons:
+  search_limit: 3
+  similarity_threshold: 0.70
+  elo_start: 50
+  elo_implicit_delta: 5
+  elo_explicit_delta: 10
+  elo_floor: 20
+  elo_deactivate_days: 30
+
+features:
+  strip_think_tags: true
+  marker_fallback: true
+  session_summary: true
+  summary_interval: 20
+  session_timeout: 1800
+
+consolidation:
+  enabled: true
+  schedule: "03:00"
+  semantic_threshold: 0.85
+  lesson_threshold: 0.85
+  cooldown_days: 180
+  stale_days: 365
