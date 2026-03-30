@@ -1,4 +1,4 @@
-# Lyume Memory Proxy
+# LyuMemory-LLM
 
 Your LLM remembers everything. Locally. No cloud needed.
 
