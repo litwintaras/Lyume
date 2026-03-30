@@ -146,6 +146,31 @@ uv run python python/wizard.py  # re-run wizard, choose "Memory Import"
 
 Supported sources: Claude Code, Cursor, Windsurf, Cline, GitHub Copilot, OpenAI Codex, Gemini CLI, Aider.
 
+> ⚠️ **WARNING: Early Alpha / WIP (Work in Progress)** ⚠️
+> 
+> This project is currently in a very early stage of development. The code is unstable, might fail to compile/run, and contains severe bugs. It is uploaded for backup, version control, and transparency purposes. Use at your own risk! Active development is ongoing.
+
+## 📝 About
+[A short description of what this project is supposed to do when it's finished. E.g., "This is a web scraper that collects data from..."]
+
+## 🛠️ What currently works
+* [Feature 1, e.g., "The basic UI renders correctly"]
+* [Feature 2, e.g., "Database connection is established"]
+
+## 🐛 Known Issues (Yeah, it's broken)
+Here is a list of known bugs and things I am currently fixing:
+* [x] **[Example of fixed bug]** - User login was failing.
+* [ ] **[Bug 1]** - The app crashes when clicking the "Submit" button.
+* [ ] **[Bug 2]** - API responses are not being parsed correctly.
+* [ ] **[TODO]** - Add error handling for the network requests.
+* [ ] **[TODO]** - Refactor the main loop to prevent memory leaks.
+
+## 🚀 How to run (If you feel brave)
+1. Clone the repository: `git clone https://github.com/your-username/your-repo.git`
+2. Install dependencies: `npm install` (or `pip install -r requirements.txt`)
+3. Run the app: `npm start` (or `python main.py`)
+
+
 ## Roadmap
 
 - [ ] Web dashboard for memory management
