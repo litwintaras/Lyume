@@ -132,14 +132,13 @@ def test_buffer_cap_sliding_window(tracker):
     assert tracker._buffer[0]["content"] == "msg3"
 
 
-def test_should_summarize_at_interval(tracker):
+def test_should_summarize_always_false(tracker):
+    """Session summary is disabled — should never trigger."""
     tracker._summary_interval = 3
     tracker.track_message("user", "1")
-    assert tracker.should_summarize() is False
     tracker.track_message("user", "2")
-    assert tracker.should_summarize() is False
     tracker.track_message("user", "3")
-    assert tracker.should_summarize() is True
+    assert tracker.should_summarize() is False
 
 
 def test_check_timeout_false_when_recent(tracker):
@@ -175,29 +174,12 @@ async def test_generate_summary_skips_short_sessions(tracker):
 
 
 @pytest.mark.asyncio
-async def test_generate_summary_calls_llm_and_saves(tracker):
-    """With enough messages, should call LLM and save to DB."""
+async def test_generate_summary_is_noop(tracker):
+    """generate_summary no longer calls LLM — returns None immediately."""
     for i in range(5):
         tracker.track_message("user", f"msg{i}")
         tracker.track_message("assistant", f"resp{i}")
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "choices": [{"message": {"content": "Summary of session"}}]
-    }
-    mock_response.status_code = 200
-
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=mock_response)
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_class.return_value = mock_client
-
-        result = await tracker.generate_summary("periodic")
-
-    assert result is not None
-    assert "Summary of session" in result
-    tracker._memory_manager.save_semantic.assert_called_once()
-    call_kwargs = tracker._memory_manager.save_semantic.call_args.kwargs
-    assert call_kwargs["category"] == "session_summary"
+    result = await tracker.generate_summary("periodic")
+    assert result is None
+    tracker._memory_manager.save_semantic.assert_not_called()
