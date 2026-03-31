@@ -45,3 +45,6 @@ postgres_data/
 
 # uv
 uv.lock
+
+# Worktrees
+.worktrees/
