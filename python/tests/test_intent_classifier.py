@@ -1,5 +1,5 @@
 import pytest
-from intent_classifier import classify_user_intent, classify_assistant_intent
+from intent_classifier import classify_user_intent, classify_assistant_intent, is_noise
 
 
 class TestUserIntent:
@@ -98,3 +98,49 @@ class TestEdgeCases:
         r2 = classify_user_intent("запамʼятай це")
         assert r1["save"] is True
         assert r2["save"] is True
+
+
+class TestIsNoise:
+    """Noise filter: trivial messages that don't need memory search."""
+
+    @pytest.mark.parametrize("text", [
+        "ок", "окей", "okay", "ok",
+        "так", "да", "yes", "yeah", "yep",
+        "ні", "нет", "no", "nope",
+        "привіт", "hello", "hi", "hey",
+        "дякую", "thx", "thanks",
+        "👍", "❤️", "🔥", "👌",
+        ".", "...", "!", "?",
+        "ну", "ага", "угу",
+    ])
+    def test_noise_detected(self, text):
+        assert is_noise(text) is True, f"Should be noise: '{text}'"
+
+    @pytest.mark.parametrize("text", [
+        "запам'ятай що мене звати Тарас",
+        "яка погода завтра в Берліні?",
+        "розкажи про Python asyncio",
+        "мене звати Тарас і мені 28 років",
+        "я працюю в Google над AI проектом",
+        "що ми робили минулий раз?",
+        "добраніч, йду спати",
+    ])
+    def test_signal_not_filtered(self, text):
+        assert is_noise(text) is False, f"Should NOT be noise: '{text}'"
+
+    def test_short_gibberish_is_noise(self):
+        assert is_noise("аа") is True
+        assert is_noise("   ") is True
+
+    def test_empty_is_noise(self):
+        assert is_noise("") is True
+
+    def test_short_with_uppercase_is_signal(self):
+        """Short but capitalized words may be names/acronyms — signal."""
+        assert is_noise("API") is False
+        assert is_noise("Docker") is False
+
+    def test_farewell_is_noise_lexically(self):
+        """'бувай' matches NOISE_PATTERN, but farewell detection happens BEFORE noise check in proxy."""
+        assert is_noise("бувай") is True
+        assert is_noise("bye") is True

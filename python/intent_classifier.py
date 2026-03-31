@@ -174,3 +174,36 @@ def classify_assistant_intent(text: str) -> dict:
         result["lesson"] = True
 
     return result
+
+
+NOISE_PATTERN = re.compile(
+    r"^("
+    r"ок|окей|okay|ok|so|ну|ага|угу|ясно|зрозуміло|добре|ладно|"
+    r"так|да|yes|yeah|yep|yup|sure|"
+    r"ні|нет|no|nope|"
+    r"привіт|привєт|хай|hello|hi|hey|"
+    r"дякую|дяки|спасибі|thx|thanks|thank you|"
+    r"бувай|пока|bye|"
+    r"[👍👌🙏❤️💯✅😊😁🔥]+|"
+    r"\.{1,3}|!{1,3}|\?{1,3}"
+    r")$",
+    re.IGNORECASE,
+)
+
+
+def is_noise(text: str) -> bool:
+    """True if message is too trivial for memory search.
+    Note: farewell detection runs BEFORE this in the proxy pipeline.
+    """
+    text = text.strip()
+    if len(text) < 3:
+        return True
+    if NOISE_PATTERN.match(text):
+        return True
+    words = text.split()
+    if len(words) <= 2:
+        # Check if any character (not just in first word) has uppercase
+        has_uppercase = any(c.isupper() for c in text)
+        if not has_uppercase:
+            return True
+    return False
