@@ -126,11 +126,11 @@ def service_setup_commands(info: PlatformInfo, venv_python: str, proxy_script: s
     """
     import re
     slug = re.sub(r"[^a-z0-9]", "-", agent_name.lower()).strip("-") or "lyume"
-    svc_name = f"lyume-proxy-{slug}"
+    svc_name = f"lyumemory-proxy-{slug}"
 
     if info.os == OS.LINUX:
         unit = f"""[Unit]
-Description={agent_name} — Lyume Memory Proxy
+Description={agent_name} — LyuMemory Proxy
 After=network.target
 
 [Service]
@@ -178,7 +178,7 @@ WantedBy=default.target"""
             "logs_cmd": f"tail -f /tmp/{svc_name}.log",
         }
     else:  # Windows
-        task_name = f"LyumeProxy-{slug}"
+        task_name = f"LyuMemoryProxy-{slug}"
         return {
             "setup_cmds": [
                 f'schtasks /create /tn "{task_name}" /tr "{venv_python} {proxy_script}" /sc onlogon /rl highest /f',

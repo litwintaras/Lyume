@@ -1,7 +1,7 @@
 """Wizard steps registry."""
 
 def all_steps():
-    from wizard.steps.identity import IdentityStep
+    from wizard.steps.openclaw_agent import OpenClawAgentStep
     from wizard.steps.backend import BackendStep
     from wizard.steps.embedding import EmbeddingStep
     from wizard.steps.docker import DockerStep
@@ -9,7 +9,7 @@ def all_steps():
     from wizard.steps.memory_import import MemoryImportStep
     from wizard.steps.summary import SummaryStep
     return [
-        IdentityStep(),
+        OpenClawAgentStep(),
         BackendStep(),
         EmbeddingStep(),
         DockerStep(),
