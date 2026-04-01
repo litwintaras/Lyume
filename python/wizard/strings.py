@@ -117,6 +117,10 @@ _STRINGS = {
         "summary_proxy": "Порт проксі",
         "summary_import": "Імпорт",
         "summary_sources": "{n} джерел(о) знайдено",
+        "openclaw_repoint_warn": "OpenClaw конфіг буде оновлено",
+        "openclaw_repoint_detail": "Порт провайдера змінено: {old} → {new}\nЦе потрібно щоб запити йшли через Memory Proxy і памʼять працювала.",
+        "openclaw_repoint_ok": "openclaw.json оновлено",
+        "openclaw_repoint_fail": "Не вдалося оновити openclaw.json: {err}",
     },
     "en": {
         "welcome_title": "Welcome to LyuMemory Wizard",
@@ -231,6 +235,10 @@ _STRINGS = {
         "summary_proxy": "Proxy port",
         "summary_import": "Import",
         "summary_sources": "{n} source(s) found",
+        "openclaw_repoint_warn": "OpenClaw config will be updated",
+        "openclaw_repoint_detail": "Provider URL changed: {old} → {new}\nThis is needed so requests go through Memory Proxy and memory works.",
+        "openclaw_repoint_ok": "openclaw.json updated",
+        "openclaw_repoint_fail": "Failed to update openclaw.json: {err}",
     },
 }
 

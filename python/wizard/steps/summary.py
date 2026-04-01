@@ -3,6 +3,7 @@ import subprocess
 import shutil
 import re
 import os
+import json
 from pathlib import Path
 
 from rich.console import Console
@@ -102,6 +103,41 @@ def _check_proxy_port(console: Console, state: WizardState) -> bool:
         return False
 
 
+def _repoint_openclaw(console: Console, state: WizardState) -> bool:
+    """Update OpenClaw provider baseUrl to point through proxy. Returns True on success."""
+    openclaw_config = Path.home() / ".openclaw" / "openclaw.json"
+    if not openclaw_config.exists():
+        return True  # no openclaw — nothing to do
+
+    try:
+        data = json.loads(openclaw_config.read_text())
+        providers = data.get("models", {}).get("providers", {})
+
+        old_url = state.llm_url  # e.g. http://127.0.0.1:1234
+        new_url = f"http://127.0.0.1:{state.proxy_port}"
+
+        changed = False
+        for name, provider in providers.items():
+            base = provider.get("baseUrl", "")
+            # Match if provider points to the LLM backend (with or without /v1)
+            if base.rstrip("/").removesuffix("/v1") == old_url.rstrip("/").removesuffix("/v1"):
+                provider["baseUrl"] = f"{new_url}/v1"
+                changed = True
+
+        if changed:
+            # Show warning to user
+            console.print(f"\n[bold yellow]⚠ {S.t('openclaw_repoint_warn')}[/bold yellow]")
+            console.print(S.t("openclaw_repoint_detail", old=old_url, new=new_url))
+
+            openclaw_config.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+            console.print(f"[green]✓ {S.t('openclaw_repoint_ok')}[/green]")
+
+        return True
+    except Exception as e:
+        console.print(f"[red]{S.t('openclaw_repoint_fail', err=str(e))}[/red]")
+        return True  # non-fatal, continue
+
+
 class SummaryStep(BaseStep):
     title = S.STEP_SUMMARY
 
@@ -152,6 +188,9 @@ class SummaryStep(BaseStep):
             venv_python = state.venv_python or str(target_dir / ".venv" / "bin" / "python")
             proxy_script = str(target_dir / "memory_proxy.py")
             working_dir = str(target_dir)
+
+            # 4. Repoint OpenClaw to proxy
+            _repoint_openclaw(console, state)
 
             # Note: proxy port was already checked at the start of run()
 
