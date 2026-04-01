@@ -8,8 +8,11 @@ from typing import Optional
 
 @dataclass
 class WizardState:
+    # OpenClaw
+    openclaw_workspace: str = ""
+    openclaw_agent_id: str = ""
     # Identity
-    agent_name: str = "Lyume"
+    agent_name: str = "lyumemory"
     user_name: str = "User"
     # Backend
     backend_name: str = ""
