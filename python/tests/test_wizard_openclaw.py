@@ -1,5 +1,7 @@
 """Tests for wizard OpenClaw integration."""
+import json
 from wizard.state import WizardState
+from wizard.steps.openclaw_agent import parse_agents_json
 
 
 def test_state_has_openclaw_fields():
@@ -38,3 +40,43 @@ def test_state_checkpoint_roundtrip(tmp_path):
     assert loaded.openclaw_workspace == "/home/user/.openclaw/workspace-lyume"
     assert loaded.openclaw_agent_id == "lyume-v2"
     assert loaded.agent_name == "lyume-v2"
+
+
+def test_parse_agents_json_valid():
+    raw = json.dumps([
+        {
+            "id": "lyume-v2",
+            "name": "lyume-v2",
+            "workspace": "/home/tarik/.openclaw/workspace-lyume",
+            "agentDir": "/home/tarik/.openclaw/agents/lyume-v2/agent",
+            "model": "home/qwen3.5-35b-a3b",
+            "bindings": 0,
+            "isDefault": True,
+            "routes": ["default (no explicit rules)"]
+        },
+        {
+            "id": "helper",
+            "name": "helper",
+            "workspace": "/home/tarik/.openclaw/workspace-helper",
+            "agentDir": "/home/tarik/.openclaw/agents/helper/agent",
+            "model": "home/llama-3",
+            "bindings": 0,
+            "isDefault": False,
+            "routes": []
+        }
+    ])
+    agents = parse_agents_json(raw)
+    assert len(agents) == 2
+    assert agents[0]["id"] == "lyume-v2"
+    assert agents[0]["workspace"] == "/home/tarik/.openclaw/workspace-lyume"
+    assert agents[1]["id"] == "helper"
+
+
+def test_parse_agents_json_empty():
+    agents = parse_agents_json("[]")
+    assert agents == []
+
+
+def test_parse_agents_json_invalid():
+    agents = parse_agents_json("not json")
+    assert agents == []
