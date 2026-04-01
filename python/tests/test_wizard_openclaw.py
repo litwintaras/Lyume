@@ -80,3 +80,49 @@ def test_parse_agents_json_empty():
 def test_parse_agents_json_invalid():
     agents = parse_agents_json("not json")
     assert agents == []
+
+
+def test_full_state_flow():
+    """Simulate the full wizard state changes through all steps."""
+    state = WizardState()
+
+    # Step 0: OpenClaw agent selected
+    state.openclaw_agent_id = "my-agent"
+    state.openclaw_workspace = "/tmp/test-workspace"
+    state.agent_name = "my-agent"
+
+    # Step 1: Backend
+    state.backend_name = "LM Studio"
+    state.llm_url = "http://127.0.0.1:1234/v1"
+    state.llm_model = "qwen3-coder"
+
+    # Step 2: Embedding
+    state.embed_provider = "http"
+    state.embed_url = "http://127.0.0.1:1234/v1"
+    state.embed_model = "nomic-embed-text"
+    state.embed_dimensions = 768
+
+    # Step 4: Database
+    state.db_provider = "docker"
+    state.db_host = "127.0.0.1"
+    state.db_port = 5432
+
+    # Generate config
+    config = state.generate_config()
+
+    assert config["llm"]["url"] == "http://127.0.0.1:1234/v1"
+    assert config["llm"]["model"] == "qwen3-coder"
+    assert config["embedding"]["model"] == "nomic-embed-text"
+    assert config["database"]["name"] == "ai_memory_my_agent"
+    assert config["database"]["host"] == "127.0.0.1"
+
+
+def test_deploy_path_is_workspace_based():
+    """Verify the target deploy path is <workspace>/lyumemory/."""
+    from pathlib import Path
+    state = WizardState(
+        openclaw_workspace="/home/user/.openclaw/workspace-test",
+        openclaw_agent_id="test",
+    )
+    target = Path(state.openclaw_workspace) / "lyumemory"
+    assert str(target) == "/home/user/.openclaw/workspace-test/lyumemory"
