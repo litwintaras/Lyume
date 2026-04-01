@@ -106,12 +106,17 @@ class SummaryStep(BaseStep):
     title = S.STEP_SUMMARY
 
     def run(self, state: WizardState, console: Console) -> StepResult:
+        # Check proxy port BEFORE showing summary
+        if not _check_proxy_port(console, state):
+            return StepResult.BACK
+
         summary_text = (
             f"  [bold]1.[/bold] {S.t('summary_agent')}:     {state.agent_name} ({state.openclaw_agent_id})\n"
             f"  [bold]2.[/bold] {S.t('summary_backend')}:   {state.backend_name} ({state.llm_model})\n"
             f"  [bold]3.[/bold] {S.t('summary_embedding')}: {state.embed_provider} ({state.embed_model})\n"
             f"  [bold]4.[/bold] {S.t('summary_database')}:  {state.db_provider} ({state.db_host}:{state.db_port})\n"
-            f"  [bold]5.[/bold] {S.t('summary_import')}:    {S.t('summary_sources', n=len(state.import_paths))}\n"
+            f"  [bold]5.[/bold] {S.t('summary_proxy')}:       127.0.0.1:{state.proxy_port}\n"
+            f"  [bold]6.[/bold] {S.t('summary_import')}:    {S.t('summary_sources', n=len(state.import_paths))}\n"
             f"  [dim]Workspace: {state.openclaw_workspace}[/dim]\n"
             f"  [dim]Deploy to: {state.openclaw_workspace}/lyumemory/[/dim]"
         )
@@ -121,14 +126,17 @@ class SummaryStep(BaseStep):
         console.print(S.t("summary_redo_hint"))
         # Explicit "Press C" instruction
         console.print(f"\n{S.t('confirm_press_c')}\n")
-        choice = Prompt.ask(S.t("summary_choice"), choices=["c", "b", "1", "2", "3", "4", "5"], show_choices=False)
+        choice = Prompt.ask(S.t("summary_choice"), choices=["c", "b", "1", "2", "3", "4", "5", "6"], show_choices=False)
 
         if choice == "b":
             return StepResult.BACK
 
-        if choice in ("1", "2", "3", "4", "5"):
-            step_map = {"1": 1, "2": 2, "3": 3, "4": 4, "5": 5}
+        if choice in ("1", "2", "3", "4", "6"):
+            step_map = {"1": 1, "2": 2, "3": 3, "4": 4, "6": 5}
             state.current_step = step_map[choice]
+            return StepResult.BACK
+        if choice == "5":
+            # Proxy port — re-check on re-entering Summary
             return StepResult.BACK
 
         if choice == "c":
@@ -139,15 +147,13 @@ class SummaryStep(BaseStep):
             if not _install_deps(console, target_dir, state):
                 return StepResult.BACK
 
-            # 3. Check proxy port
-            if not _check_proxy_port(console, state):
-                return StepResult.BACK
-
-            # 4. Setup service
+            # 3. Setup service
             info = detect_platform()
             venv_python = state.venv_python or str(target_dir / ".venv" / "bin" / "python")
             proxy_script = str(target_dir / "memory_proxy.py")
             working_dir = str(target_dir)
+
+            # Note: proxy port was already checked at the start of run()
 
             setup = service_setup_commands(info, venv_python, proxy_script, working_dir, agent_name=state.agent_name)
             svc = setup["service_name"]

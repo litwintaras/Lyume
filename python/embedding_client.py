@@ -15,7 +15,7 @@ class HTTPEmbeddingClient:
     """Sends embedding requests to OpenAI-compatible /v1/embeddings endpoint."""
 
     def __init__(self, url: str, api_key: str = "", model: str = "nomic-embed-text", timeout: int = 60):
-        self.url = url.rstrip("/")
+        self.url = url.rstrip("/").removesuffix("/v1")
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
@@ -30,7 +30,7 @@ class HTTPEmbeddingClient:
         """Get embedding vector for text."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.post(
-                f"{self.url}/embeddings",
+                f"{self.url}/v1/embeddings",
                 headers=self._headers(),
                 json={"model": self.model, "input": text},
             )

@@ -26,7 +26,7 @@ class BackendStep(BaseStep):
                 return StepResult.BACK
             if choice != 'm':
                 try:
-                    url = backends[int(choice) - 1].url.rstrip('/')
+                    url = backends[int(choice) - 1].url.rstrip('/').removesuffix("/v1")
                 except Exception:
                     pass
 
@@ -35,11 +35,11 @@ class BackendStep(BaseStep):
             url = Prompt.ask("Backend URL or 'b' back", default="http://localhost:8000")
             if url == 'b':
                 return StepResult.BACK
-            url = url.rstrip('/')
+            url = url.rstrip('/').removesuffix("/v1")
 
         # Fetch and filter models
         try:
-            r = httpx.get(f"{url}/models", timeout=5)
+            r = httpx.get(f"{url}/v1/models", timeout=5)
             all_ids = [m["id"] for m in r.json().get("data", [])]
             models = filter_llm_models(all_ids)
         except Exception:
@@ -66,7 +66,7 @@ class BackendStep(BaseStep):
         backend_name = "Custom"
         if backends:
             for b in backends:
-                if b.url.rstrip("/") == url.rstrip("/"):
+                if b.url.rstrip("/").removesuffix("/v1") == url.rstrip("/"):
                     backend_name = b.name
                     break
 

@@ -13,7 +13,7 @@ class EmbeddingStep(BaseStep):
     def run(self, state: WizardState, console: Console) -> StepResult:
         # Step 1: Fetch models from backend using state.llm_url
         try:
-            r = httpx.get(f"{state.llm_url}/models", timeout=5)
+            r = httpx.get(f"{state.llm_url}/v1/models", timeout=5)
             all_ids = [m["id"] for m in r.json().get("data", [])]
         except Exception as e:
             console.print(S.t("embed_fetch_fail", url=state.llm_url, err=e))
@@ -60,7 +60,7 @@ class EmbeddingStep(BaseStep):
                 new_url = Prompt.ask(S.t("embed_enter_url"))
                 if new_url == 'b':
                     return StepResult.BACK
-                state.llm_url = new_url.rstrip('/')
+                state.llm_url = new_url.rstrip('/').removesuffix("/v1")
                 return self.run(state, console)
             elif choice == '3':
                 path = Prompt.ask(S.t("enter_gguf_path"))
