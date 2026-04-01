@@ -1092,9 +1092,6 @@ async def chat_completions(request: Request):
                             if is_farewell:
                                 print(f"[reflection] Farewell detected, starting session analysis...", flush=True)
                                 asyncio.create_task(run_reflection(messages, user_query))
-                                if session_tracker:
-                                    asyncio.create_task(session_tracker.generate_summary("farewell"))
-                                    session_tracker.start_new_session()
                             yield "data: [DONE]\n\n"
                             break
 
@@ -1168,9 +1165,6 @@ async def chat_completions(request: Request):
         if is_farewell:
             print(f"[reflection] Farewell detected, starting session analysis...", flush=True)
             asyncio.create_task(run_reflection(messages, user_query))
-            if session_tracker:
-                asyncio.create_task(session_tracker.generate_summary("farewell"))
-                session_tracker.start_new_session()
 
         return JSONResponse(result)
 
