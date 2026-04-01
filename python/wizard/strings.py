@@ -5,7 +5,7 @@ _LANG = os.environ.get("LYUME_LANG", "uk")
 
 _STRINGS = {
     "uk": {
-        "welcome_title": "Ласкаво просимо до Lyume Wizard",
+        "welcome_title": "Ласкаво просимо до LyuMemory Wizard",
         "welcome_body": "Цей майстер допоможе вам налаштувати вашу систему Lyume для роботи з великими мовними моделями.",
         "step_identity": "Особисті дані та назва проєкту",
         "step_backend": "Вибір бекенду (LLM)",
@@ -100,6 +100,16 @@ _STRINGS = {
         "openclaw_not_found": "openclaw CLI не знайдено — пропускаю реєстрацію",
         "openclaw_fail": "Не вдалося зареєструвати агента: {err}",
         "restart_saved": "Прогрес збережено. Перезапустіть wizard після налаштування.",
+        "step_openclaw": "Вибір агента OpenClaw",
+        "openclaw_prerequisite": "⚠  Переконайтеся, що у вас вже є агент у OpenClaw.\n   Створити: openclaw agents add <id> --workspace <path>",
+        "openclaw_cli_missing": "Команду 'openclaw' не знайдено. Встановіть OpenClaw перед запуском wizard.",
+        "openclaw_scanning": "Отримую список агентів...",
+        "openclaw_agents_found": "Знайдені агенти:",
+        "openclaw_no_agents": "Не знайдено жодного агента. Створіть агента:\n  openclaw agents add <id> --workspace <path>",
+        "openclaw_pick_agent": "Виберіть агента (1-{n}) або 'q' для виходу",
+        "openclaw_selected": "Обрано: {name} → {workspace}",
+        "openclaw_list_fail": "Не вдалося отримати список агентів: {err}",
+        "confirm_press_c": "━━━ Натисніть [bold green]C[/bold green] щоб підтвердити та розпочати установку ━━━",
         "summary_agent": "Агент",
         "summary_user": "Користувач",
         "summary_backend": "Бекенд",
@@ -109,7 +119,7 @@ _STRINGS = {
         "summary_sources": "{n} джерел(о) знайдено",
     },
     "en": {
-        "welcome_title": "Welcome to Lyume Wizard",
+        "welcome_title": "Welcome to LyuMemory Wizard",
         "welcome_body": "This wizard will help you set up your Lyume system for working with large language models.",
         "step_identity": "Identity & Project Name",
         "step_backend": "LLM Backend Selection",
@@ -204,6 +214,16 @@ _STRINGS = {
         "openclaw_not_found": "openclaw CLI not found — skipping registration",
         "openclaw_fail": "Failed to register agent: {err}",
         "restart_saved": "Progress saved. Restart wizard after setup.",
+        "step_openclaw": "OpenClaw Agent Selection",
+        "openclaw_prerequisite": "⚠  Make sure you already have an agent in OpenClaw.\n   Create one: openclaw agents add <id> --workspace <path>",
+        "openclaw_cli_missing": "Command 'openclaw' not found. Install OpenClaw before running the wizard.",
+        "openclaw_scanning": "Fetching agent list...",
+        "openclaw_agents_found": "Agents found:",
+        "openclaw_no_agents": "No agents found. Create an agent first:\n  openclaw agents add <id> --workspace <path>",
+        "openclaw_pick_agent": "Pick agent (1-{n}) or 'q' to quit",
+        "openclaw_selected": "Selected: {name} → {workspace}",
+        "openclaw_list_fail": "Failed to get agent list: {err}",
+        "confirm_press_c": "━━━ Press [bold green]C[/bold green] to confirm and start installation ━━━",
         "summary_agent": "Agent",
         "summary_user": "User",
         "summary_backend": "Backend",
@@ -232,3 +252,4 @@ STEP_DOCKER = t("step_docker")
 STEP_DATABASE = t("step_database")
 STEP_IMPORT = t("step_import")
 STEP_SUMMARY = t("step_summary")
+STEP_OPENCLAW = t("step_openclaw")
