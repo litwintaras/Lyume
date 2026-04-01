@@ -26,6 +26,7 @@ from intent_classifier import (
     SOFT_SAVE_PATTERN, SOFT_LESSON_PATTERN, FAREWELL_PATTERN,
 )
 from session_tracker import SessionTracker
+from bns import BNSEngine
 
 from llm_client import LLMClient
 
@@ -74,6 +75,7 @@ _mind_state = {
     "last_action": None,       # last marker action (SAVE/RECALL/LESSON/FORGET)
     "last_action_time": None,
     "session_start": None,     # when proxy started this session
+    "bns_state": None,         # current BNS chemical state
 }
 
 THINK_PATTERN = re.compile(r"<think>.*?</think>", re.DOTALL)
@@ -157,6 +159,9 @@ def detect_mood(text: str) -> str | None:
 
 mm = MemoryManager()
 session_tracker: SessionTracker | None = None
+
+# BNS — Neurochemical Simulation
+_bns = BNSEngine(state_path=str(Path(__file__).parent / "bns_state.json"))
 
 
 def make_summary(text: str, max_len: int = 150) -> str:
@@ -799,6 +804,11 @@ async def inject_memories(body: dict) -> dict:
     if memory_block:
         system_injection += memory_block
 
+    # BNS emotional state injection
+    bns_block = _bns.get_prompt_injection()
+    if bns_block:
+        system_injection += "\n\n" + bns_block
+
     if system_injection:
         if new_messages and new_messages[0].get("role") == "system":
             new_messages[0] = {
@@ -951,9 +961,15 @@ async def run_reflection(messages: list[dict], user_query: str):
 
 
 async def _safe_process_response(text: str, query: str, mood: str | None):
-    """Fire-and-forget wrapper for process_response."""
+    """Fire-and-forget wrapper for process_response + BNS update."""
     try:
         await process_response(text, query, lyume_mood=mood)
+        # BNS: process assistant response mood (feedback loop)
+        if mood:
+            _bns.process_output_mood(mood)
+            spike = _bns.state.has_spike()
+            if spike:
+                print(f"[bns] SPIKE detected: {spike['chemical']}={spike['level']:.2f}", flush=True)
     except Exception as e:
         print(f"[process] Error in background: {e}", flush=True)
 
@@ -1006,6 +1022,15 @@ async def chat_completions(request: Request):
     user_msg_count = sum(1 for m in messages if m.get("role") == "user")
 
     body = await inject_memories(body)
+
+    # BNS: process user mood
+    user_mood = detect_mood(user_query) if user_query else None
+    if user_mood:
+        _bns.process_input_mood(user_mood)
+
+    # BNS: decay chemicals each turn
+    _bns.tick()
+    _mind_state["bns_state"] = _bns.state.to_dict()
 
     # Farewell: give Lyume a chance to save what matters to her
     if is_farewell:
