@@ -22,7 +22,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from config import cfg
 from memory_manager import MemoryManager, get_embedding, get_embedding_async
 from intent_classifier import (
-    classify_user_intent, classify_assistant_intent,
+    classify_user_intent, classify_assistant_intent, is_noise,
     SOFT_SAVE_PATTERN, SOFT_LESSON_PATTERN, FAREWELL_PATTERN,
 )
 from session_tracker import SessionTracker
@@ -693,6 +693,10 @@ async def inject_memories(body: dict) -> dict:
     if not user_query:
         return body
 
+    if is_noise(user_query):
+        print(f"[memory] Noise skipped: {user_query[:40]}", flush=True)
+        return body
+
     # Session recall — explicit "what did we do last time?"
     user_intent = classify_user_intent(user_query)
     is_explicit = bool(user_intent.get("recall"))
@@ -850,6 +854,10 @@ async def inject_memories_responses(data: dict) -> dict:
     if not user_input:
         return data
 
+    if is_noise(user_input):
+        print(f"[memory] Noise skipped (responses): {user_input[:40]}", flush=True)
+        return data
+
     # Strip OpenClaw metadata
     if "Sender (untrusted metadata)" in user_input:
         match = OPENCLAW_MSG_PATTERN.search(user_input)
@@ -940,6 +948,14 @@ async def run_reflection(messages: list[dict], user_query: str):
             print("[reflection] Empty response from model", flush=True)
     except Exception as e:
         print(f"[reflection] Error: {e}", flush=True)
+
+
+async def _safe_process_response(text: str, query: str, mood: str | None):
+    """Fire-and-forget wrapper for process_response."""
+    try:
+        await process_response(text, query, lyume_mood=mood)
+    except Exception as e:
+        print(f"[process] Error in background: {e}", flush=True)
 
 
 @app.post("/v1/chat/completions")
@@ -1044,12 +1060,9 @@ async def chat_completions(request: Request):
                                 print(f"[lyume-mood] {response_mood}", flush=True)
                                 _mind_state["last_mood"] = response_mood
                                 _mind_state["last_mood_time"] = datetime.now(timezone.utc).isoformat()
-                            await process_response(full_response, user_query, lyume_mood=response_mood)
-                            # Track assistant response for session summary
+                            asyncio.create_task(_safe_process_response(full_response, user_query, response_mood))
                             if session_tracker:
                                 session_tracker.track_message("assistant", full_response[:500])
-                                if session_tracker.should_summarize():
-                                    asyncio.create_task(session_tracker.generate_summary("periodic"))
                             # Trigger reflection on farewell
                             if is_farewell:
                                 print(f"[reflection] Farewell detected, starting session analysis...", flush=True)
@@ -1121,14 +1134,10 @@ async def chat_completions(request: Request):
                     print(f"[lyume-mood] {response_mood}", flush=True)
                     _mind_state["last_mood"] = response_mood
                     _mind_state["last_mood_time"] = datetime.now(timezone.utc).isoformat()
-                await process_response(raw, user_query, lyume_mood=response_mood)
+                asyncio.create_task(_safe_process_response(raw, user_query, response_mood))
                 msg["content"] = strip_markers(strip_think_tags(raw))
-
-        # Track assistant response for session summary
         if session_tracker:
             session_tracker.track_message("assistant", full_response[:500])
-            if session_tracker.should_summarize():
-                asyncio.create_task(session_tracker.generate_summary("periodic"))
 
         # Trigger reflection on farewell
         if is_farewell:
