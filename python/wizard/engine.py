@@ -1,6 +1,6 @@
 """Wizard engine — step navigation, checkpoint, progress."""
-from enum import Enum
 from pathlib import Path
+from enum import Enum
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -26,12 +26,21 @@ class BaseStep:
 
 
 class WizardEngine:
-    def __init__(self, config_path: str):
-        self.config_path = config_path
-        self.config_dir = str(Path(config_path).parent)
-        self.checkpoint_path = Path(self.config_dir) / ".wizard_checkpoint.yaml"
+    def __init__(self):
         self.state = WizardState()
         self._steps: list[BaseStep] = []
+        self._checkpoint_path: Path | None = None
+
+    def _resolve_paths(self):
+        """Resolve config and checkpoint paths from openclaw_workspace."""
+        if self.state.openclaw_workspace:
+            target = Path(self.state.openclaw_workspace) / "lyumemory"
+            target.mkdir(parents=True, exist_ok=True)
+            self.config_path = str(target / "config.yaml")
+            self._checkpoint_path = target / ".wizard_checkpoint.yaml"
+        else:
+            self.config_path = str(Path.cwd() / "python" / "config.yaml")
+            self._checkpoint_path = Path.cwd() / ".wizard_checkpoint.yaml"
 
     def register_steps(self, steps: list[BaseStep]):
         self._steps = steps
@@ -42,19 +51,21 @@ class WizardEngine:
         from wizard.steps import all_steps
         self.register_steps(all_steps())
 
-        # Check checkpoint
-        if self.checkpoint_path.exists():
+        # Check for existing checkpoint in default location
+        default_cp = Path.home() / ".cache" / "lyumemory" / ".wizard_checkpoint.yaml"
+        if default_cp.exists():
             console.print(f"\n{S.t('checkpoint_found')}")
             choice = Prompt.ask(S.t("checkpoint_continue"), choices=["y", "n"], default="y")
             if choice == "y":
-                self.state = WizardState.load_checkpoint(self.checkpoint_path)
+                self.state = WizardState.load_checkpoint(default_cp)
+                self._resolve_paths()
             else:
                 self.state = WizardState()
 
         # Welcome
         console.print(Panel(
             f"[bold cyan]{S.t('welcome_title')}[/bold cyan]\n\n{S.t('welcome_body')}",
-            title="Lyume",
+            title="LyuMemory",
             border_style="cyan",
         ))
 
@@ -63,7 +74,6 @@ class WizardEngine:
 
         while idx < total:
             step = self._steps[idx]
-            # Progress bar
             filled = idx
             empty = total - idx
             bar = "■" * filled + "□" * empty
@@ -79,22 +89,35 @@ class WizardEngine:
                 continue
             elif result == StepResult.RESTART:
                 self.state.current_step = idx
-                self.state.save_checkpoint(self.checkpoint_path)
+                self._save_checkpoint()
                 console.print(f"\n[yellow]{S.t('restart_saved')}[/yellow]")
                 raise SystemExit(0)
             else:
+                # After step 0 (OpenClaw), resolve paths
+                if idx == 0:
+                    self._resolve_paths()
                 idx += 1
                 self.state.current_step = idx
-                self.state.save_checkpoint(self.checkpoint_path)
+                self._save_checkpoint()
 
         # Generate and save config
+        self._resolve_paths()
         config = self.state.generate_config()
         WizardState.save_config(config, self.config_path)
-        WizardState.save_identity(self.state.agent_name, self.state.user_name, self.config_dir)
 
         # Cleanup checkpoint
-        if self.checkpoint_path.exists():
-            self.checkpoint_path.unlink()
+        if self._checkpoint_path and self._checkpoint_path.exists():
+            self._checkpoint_path.unlink()
 
         config["_import_paths"] = self.state.import_paths
         return config
+
+    def _save_checkpoint(self):
+        """Save checkpoint — use workspace path if available, otherwise cache dir."""
+        if self._checkpoint_path:
+            self._checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            self.state.save_checkpoint(self._checkpoint_path)
+        else:
+            cp = Path.home() / ".cache" / "lyumemory" / ".wizard_checkpoint.yaml"
+            cp.parent.mkdir(parents=True, exist_ok=True)
+            self.state.save_checkpoint(cp)
