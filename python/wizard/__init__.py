@@ -38,4 +38,33 @@ def detect_known_memory_paths() -> list[dict]:
     return found
 
 
-__all__ = ["run_wizard", "should_run_wizard", "detect_known_memory_paths"]
+def generate_config(agent_name="Lyume", user_name="User", llm_url="http://127.0.0.1:1234/v1",
+                    llm_model="qwen", embed_provider="http",
+                    embed_url=None, embed_model=None, db_provider="docker", **kwargs):
+    """Backward-compatible config generation from wizard."""
+    from wizard.state import WizardState
+    state = WizardState(
+        agent_name=agent_name,
+        user_name=user_name,
+        llm_url=llm_url,
+        llm_model=llm_model,
+        embed_provider=embed_provider,
+        embed_url=embed_url or llm_url,
+        embed_model=embed_model or "nomic-embed-text",
+        db_provider=db_provider,
+        **kwargs
+    )
+    return state.generate_config()
+
+
+def save_config(config, path):
+    """Backward-compatible config save."""
+    WizardState.save_config(config, path)
+
+
+def save_identity(agent_name: str, user_name: str, directory: str):
+    """Backward-compatible identity save."""
+    WizardState.save_identity(agent_name, user_name, directory)
+
+
+__all__ = ["run_wizard", "should_run_wizard", "detect_known_memory_paths", "generate_config", "save_config", "save_identity"]
