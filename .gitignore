@@ -48,3 +48,18 @@ uv.lock
 
 # Worktrees
 .worktrees/
+
+# OpenClaw workspace
+.openclaw/
+
+# Claude Code
+CLAUDE.md
+
+# Runtime identity/persona files
+HEARTBEAT.md
+SOUL.md
+TOOLS.md
+
+# Internal dev docs (plans, specs, checkpoints, reports)
+docs/superpowers/
+docs/reports/
