@@ -255,12 +255,6 @@ class MemoryManager:
         category_filter = ""
         params = [json.dumps(embedding), threshold, limit]
 
-        cooldown_filter = ""
-        if not explicit_recall:
-            cooldown_days = getattr(cfg.consolidation, 'cooldown_days', 180)
-            cooldown_filter = f"AND (last_accessed IS NULL OR last_accessed < now() - make_interval(days => ${len(params) + 1}))"
-            params.append(cooldown_days)
-
         if category:
             category_filter = f"AND category = ${len(params) + 1}"
             params.append(category)
@@ -271,7 +265,7 @@ class MemoryManager:
                    last_accessed, access_count,
                    1 - (embedding <=> $1::vector) AS similarity
             FROM memories_semantic
-            WHERE 1 - (embedding <=> $1::vector) > $2 {archive_filter} {cooldown_filter} {category_filter}
+            WHERE 1 - (embedding <=> $1::vector) > $2 {archive_filter} {category_filter}
             ORDER BY embedding <=> $1::vector
             LIMIT $3
             """,
@@ -321,12 +315,7 @@ class MemoryManager:
             return []
         await self.connect()
 
-        cooldown_filter = ""
         params = [sanitized, limit]
-        if not explicit_recall:
-            cooldown_days = getattr(cfg.consolidation, 'cooldown_days', 180)
-            cooldown_filter = f"AND (last_accessed IS NULL OR last_accessed < now() - make_interval(days => $3))"
-            params.append(cooldown_days)
 
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
@@ -337,7 +326,6 @@ class MemoryManager:
                 FROM memories_semantic
                 WHERE archived = false
                   AND search_vector @@ plainto_tsquery('simple', $1)
-                  {cooldown_filter}
                 ORDER BY similarity DESC
                 LIMIT $2
                 """,

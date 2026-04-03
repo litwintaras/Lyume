@@ -109,6 +109,65 @@ def _env_override(config: dict) -> dict:
     return config
 
 
+_DEFAULTS = {
+    "memory": {
+        "search_limit": 3,
+        "similarity_threshold": 0.3,
+        "dedup_similarity": 0.9,
+        "save_max_chars": 300,
+        "dedup_ttl": 5,
+        "hybrid_search": True,
+        "hybrid_rrf_k": 60,
+        "hybrid_bm25_limit": 10,
+        "proactive_high_similarity": 0.85,
+        "proactive_dormant_days": 30,
+        "summary_similarity": 0.8,
+        "dormant_hint_similarity": 0.6,
+        "overlap_threshold": 0.5,
+        "happy_search_threshold": 0.4,
+        "archive_similarity": 0.85,
+    },
+    "lessons": {
+        "search_limit": 3,
+        "similarity_threshold": 0.7,
+        "elo_start": 50,
+        "elo_implicit_delta": 5,
+        "elo_explicit_delta": 10,
+        "elo_floor": 20,
+        "elo_deactivate_days": 30,
+        "active_similarity": 0.85,
+    },
+    "features": {
+        "strip_think_tags": True,
+        "marker_fallback": True,
+        "session_summary": True,
+        "summary_interval": 20,
+        "session_timeout": 1800,
+        "summary_buffer_cap": 60,
+        "summary_max_context": 30,
+    },
+    "consolidation": {
+        "enabled": True,
+        "schedule": "03:00",
+        "semantic_threshold": 0.85,
+        "lesson_threshold": 0.85,
+        "cooldown_days": 180,
+        "stale_days": 365,
+    },
+}
+
+
+def _apply_defaults(data: dict) -> dict:
+    """Merge defaults into config — only fills missing keys."""
+    for section, defaults in _DEFAULTS.items():
+        if section not in data:
+            data[section] = {}
+        for key, value in defaults.items():
+            if key not in data[section]:
+                data[section][key] = value
+    return data
+
+
 def load_config() -> _Section:
     config_path = os.environ.get(
         "LYUME_CONFIG",
@@ -118,6 +177,7 @@ def load_config() -> _Section:
         data = yaml.safe_load(f)
     data = _migrate_config(data)
     data = _env_override(data)
+    data = _apply_defaults(data)
     return _Section(data)
 
 

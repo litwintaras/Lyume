@@ -111,8 +111,9 @@ class DatabaseStep(BaseStep):
             state.db_user = Prompt.ask(S.t("db_user"), default="postgres")
             state.db_password = Prompt.ask(S.t("db_password"), password=True)
 
-        # Generate db_name from agent_name
-        normalized = re.sub(r"[^a-z0-9_]", "_", state.agent_name.lower()).strip("_")
-        state.db_name = f"ai_memory_{normalized}"
+        # Generate db_name from openclaw identity name
+        identity = state.openclaw_identity_name or state.openclaw_agent_id or state.agent_name
+        normalized = re.sub(r"[^a-z0-9_]", "_", identity.lower()).strip("_")
+        state.db_name = f"openclaw_{normalized}"
 
         return StepResult.NEXT

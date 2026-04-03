@@ -79,7 +79,8 @@ class OpenClawAgentStep(BaseStep):
                 selected = agents[idx]
                 state.openclaw_agent_id = selected["id"]
                 state.openclaw_workspace = selected.get("workspace", "")
-                state.agent_name = selected["id"]
+                state.openclaw_identity_name = selected.get("identityName", "")
+                state.agent_name = selected.get("identityName", "") or selected["id"]
                 state.user_name = state.user_name or "User"
                 console.print(f"[green]✓ {S.t('openclaw_selected', name=selected['id'], workspace=state.openclaw_workspace)}[/green]")
                 return StepResult.NEXT

@@ -9,6 +9,7 @@ Marker parsing (>>SAVE, >>LESSON, etc.) kept as fallback.
 import asyncio
 import hashlib
 import json
+import logging
 import re
 import time
 from contextlib import asynccontextmanager
@@ -18,6 +19,8 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
+
+logger = logging.getLogger(__name__)
 
 from config import cfg
 from memory_manager import MemoryManager, get_embedding, get_embedding_async
@@ -195,6 +198,50 @@ REFLECTION_OFFER_PATTERN = re.compile(
 )
 
 
+def auto_detect_model():
+    """
+    Автоматично визначає моделі через GET запит до /v1/models.
+    Записує першу модель без 'embed' у cfg.llm.model,
+    першу модель з 'embed' у cfg.embedding.model.
+    У разі помилки або невдачі — залишає поточні значення.
+    """
+    try:
+        response = httpx.get(f"{cfg.llm.url}/v1/models", timeout=5)
+        response.raise_for_status()
+        models_data = response.json()
+
+        if not isinstance(models_data, dict) or "data" not in models_data:
+            print("[auto-detect] failed, using config: no valid models data", flush=True)
+            return
+
+        models = models_data["data"]
+        if not isinstance(models, list):
+            print("[auto-detect] failed, using config: models is not a list", flush=True)
+            return
+
+        llm_model = None
+        embed_model = None
+
+        for model in models:
+            model_name = model.get("id", "")
+            if not isinstance(model_name, str):
+                continue
+            if 'embed' in model_name.lower() and embed_model is None:
+                embed_model = model_name
+            elif 'embed' not in model_name.lower() and llm_model is None:
+                llm_model = model_name
+
+        if llm_model:
+            cfg.llm.model = llm_model
+            print(f"[auto-detect] model: {llm_model}", flush=True)
+        if embed_model:
+            cfg.embedding.model = embed_model
+            print(f"[auto-detect] embedding model: {embed_model}", flush=True)
+
+    except Exception as e:
+        print(f"[auto-detect] failed, using config: {e}", flush=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Check if first run — launch wizard
@@ -223,6 +270,9 @@ async def lifespan(app: FastAPI):
             LM_STUDIO_HEADERS["Authorization"] = f"Bearer {LM_STUDIO_API_KEY}"
 
     await mm.connect()
+
+    # Auto-detect models from LM Studio
+    auto_detect_model()
 
     # Deferred memory import (from wizard)
     if hasattr(cfg, '_import_paths') and cfg._import_paths:
@@ -322,7 +372,10 @@ def build_memory_block(memories: list[dict]) -> str:
         hint = _mood_hint(m.get("mood"), m.get("lyume_mood"))
         # High relevance (>80%) — show full content; otherwise summary
         text = m["content"]
-        if sim < cfg.memory.summary_similarity and m.get("summary"):
+        summary_sim = getattr(cfg.memory, 'summary_similarity', 0.8)
+        if not isinstance(summary_sim, (int, float)):
+            summary_sim = 0.8
+        if sim < summary_sim and m.get("summary"):
             text = m["summary"]
         lines.append(f"- [{sim:.0%}]{tag} {text}{hint}")
     lines.append("</recalled_memories>")
@@ -531,7 +584,29 @@ async def process_response(text: str, user_query: str = "", lyume_mood: str | No
                 else:
                     print(f"[elo] RATE_LESSON format invalid: {content}", flush=True)
 
-    # 2. Classifier on assistant response (if no marker already handled it)
+    # 2. User-side classifier fallback (user asked to save but model didn't)
+    if not has_save and user_query:
+        user_intent = classify_user_intent(user_query)
+        if user_intent["save"] and user_intent["save_content"] and len(user_intent["save_content"]) > 5:
+            rich_fact = f"Taras: {user_query[:200]}"
+            if clean_text:
+                response_summary = clean_text[:200].strip()
+                if response_summary:
+                    rich_fact += f"\nLyume: {response_summary}"
+            mood = detect_mood(user_query)
+            mem_id = await mm.save_semantic(
+                content=rich_fact,
+                category="user_request",
+                source_info={"source": "classifier_fallback"},
+                mood=mood,
+                lyume_mood=lyume_mood,
+                summary=make_summary(rich_fact),
+            )
+            actions.append({"action": "save", "content": rich_fact, "id": mem_id})
+            has_save = True
+            print(f"[classifier] user save fallback: {rich_fact[:80]}", flush=True)
+
+    # 3. Classifier on assistant response (if no marker already handled it)
     if not has_save and clean_text:
         assistant_intent = classify_assistant_intent(clean_text)
 
@@ -579,27 +654,6 @@ async def process_response(text: str, user_query: str = "", lyume_mood: str | No
                     )
                     actions.append({"action": "lesson", "content": lesson_content, "id": lesson_id})
                     print(f"[classifier] lesson: {lesson_content[:80]}", flush=True)
-
-    # 3. User-side classifier fallback (user asked to save but model didn't)
-    if not has_save and user_query:
-        user_intent = classify_user_intent(user_query)
-        if user_intent["save"] and user_intent["save_content"] and len(user_intent["save_content"]) > 5:
-            rich_fact = f"Taras: {user_query[:200]}"
-            if clean_text:
-                response_summary = clean_text[:200].strip()
-                if response_summary:
-                    rich_fact += f"\nLyume: {response_summary}"
-            mood = detect_mood(user_query)
-            mem_id = await mm.save_semantic(
-                content=rich_fact,
-                category="user_request",
-                source_info={"source": "classifier_fallback"},
-                mood=mood,
-                lyume_mood=lyume_mood,
-                summary=make_summary(rich_fact),
-            )
-            actions.append({"action": "save", "content": rich_fact, "id": mem_id})
-            print(f"[classifier] user save fallback: {rich_fact[:80]}", flush=True)
 
     if actions:
         last = actions[-1]
@@ -810,6 +864,7 @@ async def inject_memories(body: dict) -> dict:
         system_injection += "\n\n" + bns_block
 
     if system_injection:
+        print(f"[DEBUG-INJECT] system_injection:\n{system_injection[:1000]}", flush=True)
         if new_messages and new_messages[0].get("role") == "system":
             new_messages[0] = {
                 **new_messages[0],
@@ -828,6 +883,7 @@ async def inject_memories(body: dict) -> dict:
         inject_before_user += "\n\n" + self_check.strip()
 
     if inject_before_user:
+        print(f"[DEBUG-INJECT] before_user:\n{inject_before_user[:1000]}", flush=True)
         last_user_idx = None
         for i in range(len(new_messages) - 1, -1, -1):
             if new_messages[i].get("role") == "user":
@@ -1023,6 +1079,10 @@ async def chat_completions(request: Request):
 
     body = await inject_memories(body)
 
+    # Override model with auto-detected one (client may send stale model name)
+    if cfg.llm.model:
+        body["model"] = cfg.llm.model
+
     # BNS: process user mood
     user_mood = detect_mood(user_query) if user_query else None
     if user_mood:
@@ -1179,7 +1239,7 @@ async def proxy_passthrough(request: Request, path: str):
         if k.lower() not in ("host", "content-length")
     }
     # Ensure auth header is set for LM Studio
-    if "authorization" not in {k.lower() for k in headers}:
+    if LM_STUDIO_API_KEY and "authorization" not in {k.lower() for k in headers}:
         headers["Authorization"] = f"Bearer {LM_STUDIO_API_KEY}"
 
     # For responses endpoint: convert to completions API
@@ -1232,6 +1292,8 @@ async def proxy_passthrough(request: Request, path: str):
 
                 # Inject memories
                 comp_body = await inject_memories(comp_body)
+                if cfg.llm.model:
+                    comp_body["model"] = cfg.llm.model
 
                 stream = comp_body.get("stream", False)
                 if stream:
@@ -1260,7 +1322,7 @@ async def proxy_passthrough(request: Request, path: str):
     async with httpx.AsyncClient(timeout=cfg.llm.request_timeout) as client:
         resp = await client.request(
             method=request.method,
-            url=f"{LM_STUDIO_URL}/{path}",
+            url=f"{LM_STUDIO_URL}/v1/{path}",
             content=body,
             headers=headers,
         )

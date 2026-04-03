@@ -11,6 +11,7 @@ class WizardState:
     # OpenClaw
     openclaw_workspace: str = ""
     openclaw_agent_id: str = ""
+    openclaw_identity_name: str = ""
     # Identity
     agent_name: str = "lyumemory"
     user_name: str = "User"
@@ -52,8 +53,9 @@ class WizardState:
 
     def generate_config(self) -> dict:
         """Generate config.yaml dict from wizard state."""
-        normalized = re.sub(r"[^a-z0-9_]", "_", self.agent_name.lower()).strip("_")
-        db_name = self.db_name or f"ai_memory_{normalized}"
+        identity = self.openclaw_identity_name or self.openclaw_agent_id or self.agent_name
+        normalized = re.sub(r"[^a-z0-9_]", "_", identity.lower()).strip("_")
+        db_name = self.db_name or f"openclaw_{normalized}"
 
         config = {
             "first_run": False,
