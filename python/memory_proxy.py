@@ -167,6 +167,37 @@ session_tracker: SessionTracker | None = None
 _bns = BNSEngine(state_path=str(Path(__file__).parent / "bns_state.json"))
 
 
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F600-\U0001F64F"  # emoticons
+    "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    "\U0001F680-\U0001F6FF"  # transport & map
+    "\U0001F1E0-\U0001F1FF"  # flags
+    "\U00002702-\U000027B0"
+    "\U0000FE00-\U0000FE0F"  # variation selectors
+    "\U0000200D"             # zero width joiner
+    "\U00002640-\U00002642"
+    "\U0001F900-\U0001F9FF"  # supplemental symbols
+    "\U00002600-\U000026FF"
+    "]+",
+)
+
+_WRAPPER_RE = re.compile(
+    r"^(Lyume вирішила запамʼятати:\s*|Lyume усвідомила:\s*|Taras:\s*)",
+    re.IGNORECASE,
+)
+
+
+def clean_for_memory(text: str) -> str:
+    """Strip emoji, wrapper prefixes, and excessive whitespace from memory content."""
+    text = _EMOJI_RE.sub("", text)
+    text = _WRAPPER_RE.sub("", text)
+    # Collapse whitespace
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    return text.strip()
+
+
 def make_summary(text: str, max_len: int = 150) -> str:
     """Extract a short summary from text — first meaningful sentence or truncated."""
     text = text.strip()
@@ -236,7 +267,11 @@ def auto_detect_model():
             print(f"[auto-detect] model: {llm_model}", flush=True)
         if embed_model:
             cfg.embedding.model = embed_model
-            print(f"[auto-detect] embedding model: {embed_model}", flush=True)
+            print(f"[auto-detect] embedding: {embed_model}", flush=True)
+            print(f"[auto-detect] hint: for OpenClaw memory_search, set memorySearch.model to '{embed_model}'", flush=True)
+
+        if not llm_model and not embed_model:
+            print("[auto-detect] no models found at backend", flush=True)
 
     except Exception as e:
         print(f"[auto-detect] failed, using config: {e}", flush=True)
@@ -508,6 +543,7 @@ async def process_response(text: str, user_query: str = "", lyume_mood: str | No
 
             if cmd == "SAVE" and len(content) > 3:
                 has_save = True
+                content = clean_for_memory(content)
                 category = param or "auto"
                 mood = detect_mood(user_query) if user_query else None
                 mem_id = await mm.save_semantic(
@@ -588,11 +624,7 @@ async def process_response(text: str, user_query: str = "", lyume_mood: str | No
     if not has_save and user_query:
         user_intent = classify_user_intent(user_query)
         if user_intent["save"] and user_intent["save_content"] and len(user_intent["save_content"]) > 5:
-            rich_fact = f"Taras: {user_query[:200]}"
-            if clean_text:
-                response_summary = clean_text[:200].strip()
-                if response_summary:
-                    rich_fact += f"\nLyume: {response_summary}"
+            rich_fact = clean_for_memory(user_intent["save_content"][:300])
             mood = detect_mood(user_query)
             mem_id = await mm.save_semantic(
                 content=rich_fact,
@@ -618,7 +650,7 @@ async def process_response(text: str, user_query: str = "", lyume_mood: str | No
                 end = clean_text.find(".", pos)
                 sentence = clean_text[start + 1 : end + 1 if end > 0 else len(clean_text)].strip()
                 if sentence and len(sentence) > 10:
-                    save_content = f"Lyume вирішила запамʼятати: {sentence[:cfg.memory.save_max_chars]}"
+                    save_content = clean_for_memory(sentence[:cfg.memory.save_max_chars])
                     mood = detect_mood(user_query) if user_query else None
                     mem_id = await mm.save_semantic(
                         content=save_content,
@@ -864,7 +896,6 @@ async def inject_memories(body: dict) -> dict:
         system_injection += "\n\n" + bns_block
 
     if system_injection:
-        print(f"[DEBUG-INJECT] system_injection:\n{system_injection[:1000]}", flush=True)
         if new_messages and new_messages[0].get("role") == "system":
             new_messages[0] = {
                 **new_messages[0],
@@ -883,7 +914,6 @@ async def inject_memories(body: dict) -> dict:
         inject_before_user += "\n\n" + self_check.strip()
 
     if inject_before_user:
-        print(f"[DEBUG-INJECT] before_user:\n{inject_before_user[:1000]}", flush=True)
         last_user_idx = None
         for i in range(len(new_messages) - 1, -1, -1):
             if new_messages[i].get("role") == "user":
