@@ -229,13 +229,21 @@ REFLECTION_OFFER_PATTERN = re.compile(
 )
 
 
-def auto_detect_model():
+_auto_detect_cache: dict = {"last_check": 0.0, "ttl": 60}
+
+
+def auto_detect_model(force: bool = False):
     """
     Автоматично визначає моделі через GET запит до /v1/models.
     Записує першу модель без 'embed' у cfg.llm.model,
     першу модель з 'embed' у cfg.embedding.model.
     У разі помилки або невдачі — залишає поточні значення.
+    Кешує результат на 60 секунд.
     """
+    now = time.monotonic()
+    if not force and now - _auto_detect_cache["last_check"] < _auto_detect_cache["ttl"]:
+        return
+    _auto_detect_cache["last_check"] = now
     try:
         response = httpx.get(f"{cfg.llm.url}/v1/models", timeout=5)
         response.raise_for_status()
@@ -262,13 +270,13 @@ def auto_detect_model():
             elif 'embed' not in model_name.lower() and llm_model is None:
                 llm_model = model_name
 
-        if llm_model:
-            cfg.llm.model = llm_model
+        if llm_model and llm_model != cfg.llm.model:
             print(f"[auto-detect] model: {llm_model}", flush=True)
-        if embed_model:
-            cfg.embedding.model = embed_model
+            cfg.llm.model = llm_model
+        if embed_model and embed_model != cfg.embedding.model:
             print(f"[auto-detect] embedding: {embed_model}", flush=True)
             print(f"[auto-detect] hint: for OpenClaw memory_search, set memorySearch.model to '{embed_model}'", flush=True)
+            cfg.embedding.model = embed_model
 
         if not llm_model and not embed_model:
             print("[auto-detect] no models found at backend", flush=True)
@@ -307,7 +315,7 @@ async def lifespan(app: FastAPI):
     await mm.connect()
 
     # Auto-detect models from LM Studio
-    auto_detect_model()
+    auto_detect_model(force=True)
 
     # Deferred memory import (from wizard)
     if hasattr(cfg, '_import_paths') and cfg._import_paths:
@@ -1108,6 +1116,9 @@ async def chat_completions(request: Request):
     user_msg_count = sum(1 for m in messages if m.get("role") == "user")
 
     body = await inject_memories(body)
+
+    # Re-detect model periodically (handles hot-swap in LM Studio)
+    auto_detect_model()
 
     # Override model with auto-detected one (client may send stale model name)
     if cfg.llm.model:
