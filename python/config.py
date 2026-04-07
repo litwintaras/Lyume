@@ -145,6 +145,12 @@ _DEFAULTS = {
         "session_timeout": 1800,
         "summary_buffer_cap": 60,
         "summary_max_context": 30,
+        "conversation_buffer": True,
+        "buffer_max_entries": 200,
+        "buffer_weight_cutoff": 0.05,
+        "buffer_max_inject": 15,
+        "buffer_max_chars": 500,
+        "buffer_decay_power": 0.5,
     },
     "consolidation": {
         "enabled": True,
