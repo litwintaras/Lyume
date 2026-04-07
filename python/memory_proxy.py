@@ -32,6 +32,7 @@ from session_tracker import SessionTracker
 from bns import BNSEngine
 
 from llm_client import LLMClient
+from conversation_buffer import ConversationBuffer
 
 _llm_client = LLMClient(
     url=cfg.llm.url,
@@ -80,6 +81,17 @@ _mind_state = {
     "session_start": None,     # when proxy started this session
     "bns_state": None,         # current BNS chemical state
 }
+
+# Short-term conversation buffer
+_conv_buffer = ConversationBuffer(
+    max_entries=getattr(cfg.features, "buffer_max_entries", 200),
+    weight_cutoff=getattr(cfg.features, "buffer_weight_cutoff", 0.05),
+    max_inject=getattr(cfg.features, "buffer_max_inject", 15),
+    max_chars=getattr(cfg.features, "buffer_max_chars", 500),
+    decay_power=getattr(cfg.features, "buffer_decay_power", 0.5),
+)
+_buffer_enabled = getattr(cfg.features, "conversation_buffer", True)
+_buffer_path = Path(__file__).parent / "conversation_buffer.json"
 
 THINK_PATTERN = re.compile(r"<think>.*?</think>", re.DOTALL)
 THINK_UNCLOSED_PATTERN = re.compile(r"<think>.*", re.DOTALL)
@@ -339,8 +351,13 @@ async def lifespan(app: FastAPI):
     if cfg.features.session_summary:
         session_tracker = SessionTracker(mm, LM_STUDIO_URL, LM_STUDIO_HEADERS)
         print("[session] Session tracker enabled", flush=True)
+    if _buffer_enabled:
+        _conv_buffer.load(_buffer_path)
+        print("[buffer] Conversation buffer enabled", flush=True)
     print("Memory proxy started — port 1235 → LM Studio 1234", flush=True)
     yield
+    if _buffer_enabled:
+        _conv_buffer.dump(_buffer_path)
     await mm.close()
 
 
@@ -820,6 +837,11 @@ async def inject_memories(body: dict) -> dict:
                 messages.insert(0, {"role": "system", "content": session_block.strip()})
             print(f"[session] Recalled {len(session_memories)} session summaries", flush=True)
 
+    # Short-term conversation buffer injection
+    conv_block = ""
+    if _buffer_enabled:
+        conv_block = _conv_buffer.format_block()
+
     t0 = time.monotonic()
 
     # Count user messages — for warmup detection
@@ -893,6 +915,8 @@ async def inject_memories(body: dict) -> dict:
 
     # Memories + warmup go into system prompt (background context)
     system_injection = ""
+    if conv_block:
+        system_injection += "\n\n" + conv_block
     if warmup_block:
         system_injection += warmup_block
     if memory_block:
@@ -1081,6 +1105,8 @@ async def chat_completions(request: Request):
             asyncio.create_task(session_tracker.generate_summary("timeout"))
             session_tracker.start_new_session()
         session_tracker.track_message("user", user_query)
+    if _buffer_enabled and user_query:
+        _conv_buffer.add("user", user_query)
 
     # Request dedup — skip identical requests within TTL
     now = time.monotonic()
@@ -1189,6 +1215,8 @@ async def chat_completions(request: Request):
                             asyncio.create_task(_safe_process_response(full_response, user_query, response_mood))
                             if session_tracker:
                                 session_tracker.track_message("assistant", full_response[:500])
+                            if _buffer_enabled:
+                                _conv_buffer.add("assistant", full_response[:500])
                             # Trigger reflection on farewell
                             if is_farewell:
                                 print(f"[reflection] Farewell detected, starting session analysis...", flush=True)
@@ -1261,6 +1289,8 @@ async def chat_completions(request: Request):
                 msg["content"] = strip_markers(strip_think_tags(raw))
         if session_tracker:
             session_tracker.track_message("assistant", full_response[:500])
+        if _buffer_enabled:
+            _conv_buffer.add("assistant", full_response[:500])
 
         # Trigger reflection on farewell
         if is_farewell:
